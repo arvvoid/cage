@@ -1,5 +1,5 @@
 project('cage', 'c',
-  version: '0.2.1',
+  version: '0.3.0',
   license: 'MIT',
   meson_version: '>=0.58.1',
   default_options: [
@@ -18,6 +18,8 @@ add_project_arguments(
   language: 'c',
 )
 
+fs = import('fs')
+
 if get_option('buildtype').startswith('debug')
   add_project_arguments('-DDEBUG', language : 'c')
 endif
@@ -35,48 +37,26 @@ if is_freebsd
   )
 endif
 
-wlroots        = dependency('wlroots-0.19', fallback: ['wlroots', 'wlroots'])
-wayland_protos = dependency('wayland-protocols', version: '>=1.14')
+wlroots        = dependency('wlroots-0.20', fallback: ['wlroots', 'wlroots'])
 wayland_server = dependency('wayland-server')
 xkbcommon      = dependency('xkbcommon')
 math           = cc.find_library('m')
 
-wl_protocol_dir = wayland_protos.get_variable('pkgdatadir')
-wayland_scanner = find_program('wayland-scanner')
-wayland_scanner_server = generator(
-  wayland_scanner,
-  output: '@BASENAME@-protocol.h',
-  arguments: ['server-header', '@INPUT@', '@OUTPUT@'],
-)
-
-server_protocols = [
-  [wl_protocol_dir, 'stable/xdg-shell/xdg-shell.xml'],
-]
-
-server_protos_headers = []
-
-foreach p : server_protocols
-  xml = join_paths(p)
-  server_protos_headers += wayland_scanner_server.process(xml)
-endforeach
-
-server_protos = declare_dependency(
-  sources: server_protos_headers,
-)
-
 have_xwayland = wlroots.get_variable(pkgconfig: 'have_xwayland', internal: 'have_xwayland') == 'true'
 
 version = '@0@'.format(meson.project_version())
-git = find_program('git', native: true, required: false)
-if git.found()
-  git_commit = run_command([git, 'rev-parse', '--short', 'HEAD'], check: false)
-  git_branch = run_command([git, 'rev-parse', '--abbrev-ref', 'HEAD'], check: false)
-  if git_commit.returncode() == 0 and git_branch.returncode() == 0
-    version = '@0@-@1@ (branch \'@2@\')'.format(
-      meson.project_version(),
-      git_commit.stdout().strip(),
-      git_branch.stdout().strip(),
-    )
+if fs.is_dir('.git')
+  git = find_program('git', native: true, required: false)
+  if git.found()
+    git_commit = run_command([git, 'rev-parse', '--short', 'HEAD'], check: false)
+    git_branch = run_command([git, 'rev-parse', '--abbrev-ref', 'HEAD'], check: false)
+    if git_commit.returncode() == 0 and git_branch.returncode() == 0
+      version = '@0@-@1@ (branch \'@2@\')'.format(
+        meson.project_version(),
+        git_commit.stdout().strip(),
+        git_branch.stdout().strip(),
+      )
+    endif
   endif
 endif
 
@@ -117,30 +97,19 @@ cage_sources = [
   'seat.c',
   'view.c',
   'xdg_shell.c',
-]
-
-cage_headers = [
   configure_file(input: 'config.h.in',
                  output: 'config.h',
                  configuration: conf_data),
-  'idle_inhibit_v1.h',
-  'output.h',
-  'seat.h',
-  'server.h',
-  'view.h',
-  'xdg_shell.h',
 ]
 
 if conf_data.get('CAGE_HAS_XWAYLAND', 0) == 1
   cage_sources += 'xwayland.c'
-  cage_headers += 'xwayland.h'
 endif
 
 executable(
   meson.project_name(),
-  cage_sources + cage_headers,
+  cage_sources,
   dependencies: [
-    server_protos,
     wayland_server,
     wlroots,
     xkbcommon,

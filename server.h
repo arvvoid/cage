@@ -70,8 +70,14 @@ struct cg_server {
 
 	struct wlr_foreign_toplevel_manager_v1 *foreign_toplevel_manager;
 
+	struct wlr_xcursor_manager *xcursor_manager;
+
+	struct wlr_cursor_shape_manager_v1 *cursor_shape_manager_v1;
+	struct wl_listener cursor_shape_manager_set_shape;
+
 	bool xdg_decoration;
 	bool allow_vt_switch;
+	bool enable_xwayland;
 	bool return_app_code;
 	bool terminated;
 	enum wlr_log_importance log_level;
